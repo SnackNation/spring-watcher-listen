@@ -17,6 +17,8 @@ end
 module Spring
   module Watcher
     class Listen < Abstract
+      IGNORED_DIRECTORIES = %w[. .. node_modules].map(&:freeze).freeze
+
       Spring.watch_method = self
 
       attr_reader :listener
@@ -55,10 +57,17 @@ module Spring
       end
 
       def base_directories
-        ([root] +
-          files.reject       { |f| f.start_with? "#{root}/" }.map { |f| File.expand_path("#{f}/..") } +
-          directories.reject { |d| d.start_with? "#{root}/" }
-        ).uniq.map { |path| Pathname.new(path) }
+        project_subdirectories =
+          Dir.entries(root).
+            reject { |entry| IGNORED_DIRECTORIES.include?(entry) }.
+            map { |entry| File.join(root, entry) }.
+            select { |entry| File.directory?(entry) }
+
+        (
+          project_subdirectories +
+          files.map { |f| File.expand_path("#{f}/..") } +
+          directories.to_a
+        ).uniq.map { |path| Pathname.new(path) }.reject { |path| path == Pathname.new(root) }
       end
     end
   end
